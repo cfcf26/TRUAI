@@ -1,9 +1,9 @@
 // ScrapingBee integration for web scraping
 
+import { SCRAPINGBEE_API_KEY } from './env';
 import * as cheerio from 'cheerio';
 import type { SourceContent } from './types';
 
-const SCRAPINGBEE_API_KEY = process.env.SCRAPINGBEE_API_KEY || '';
 const SCRAPING_TIMEOUT = 15000; // 15 seconds
 
 // Academic domains
@@ -161,6 +161,11 @@ export async function scrapeUrl(url: string): Promise<SourceContent> {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      // If rate limited (429), fallback to direct fetch
+      if (response.status === 429) {
+        console.warn(`ScrapingBee rate limited for ${url}, falling back to direct fetch`);
+        return scrapeDirect(url);
+      }
       throw new Error(`ScrapingBee API error: ${response.status} ${response.statusText}`);
     }
 

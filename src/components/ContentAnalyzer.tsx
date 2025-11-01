@@ -17,9 +17,9 @@ export function ContentAnalyzer({ content }: ContentAnalyzerProps) {
       case "high":
         return "bg-[rgba(220,252,231,0.5)] hover:bg-[rgba(220,252,231,0.7)]";
       case "medium":
-        return "bg-transparent hover:bg-gray-50/50";
+        return "bg-[rgba(255,240,133,0.5)] hover:bg-[rgba(255,240,133,0.7)]";
       case "low":
-        return "bg-transparent hover:bg-gray-50/50";
+        return "bg-[rgba(255,201,201,0.5)] hover:bg-[rgba(255,201,201,0.7)]";
       default:
         return "bg-transparent";
     }

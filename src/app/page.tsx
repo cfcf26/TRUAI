@@ -8,7 +8,7 @@ import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AnalyzedContent } from "@/types/content";
 import { useVerification } from "@/hooks/useVerification";
-import { documentToAnalyzedContent, updateParagraphWithResult } from "@/utils/typeAdapter";
+import { documentToAnalyzedContent, confidenceToNumber, confidenceToLevel } from "@/utils/typeAdapter";
 import { Paragraph } from "@/lib/types";
 
 export default function Home() {
@@ -26,12 +26,24 @@ export default function Home() {
       setAnalyzedContent((prev) => {
         if (!prev) return prev;
 
-        const paragraph = paragraphs.find(p => p.id === result.paragraph_id);
-        if (!paragraph) return prev;
-
-        return updateParagraphWithResult(prev, paragraph, result);
+        // Update the paragraph directly without needing the paragraphs state
+        return {
+          ...prev,
+          paragraphs: prev.paragraphs.map((p) =>
+            p.id === result.paragraph_id
+              ? {
+                  id: p.id,
+                  content: p.content,
+                  confidence: confidenceToNumber(result.confidence),
+                  confidenceLevel: confidenceToLevel(result.confidence),
+                  sources: result.link_digests.map((digest) => digest.url),
+                  reasoning: result.reasoning,
+                }
+              : p
+          ),
+        };
       });
-    }, [paragraphs]),
+    }, []),
 
     onComplete: useCallback((docId) => {
       console.log('[UI] Verification complete for:', docId);

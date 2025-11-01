@@ -105,6 +105,10 @@ class VerificationStorage {
 
     this.results.set(doc_id, results);
 
+    console.log(
+      `[Storage] Stored result for paragraph ${result.paragraph_id} in doc ${doc_id}. Total results: ${results.length}, Listeners: ${this.listeners.onUpdate.length}`
+    );
+
     // Update job status
     this.updateJobStatus(doc_id, result.paragraph_id, 'completed');
 

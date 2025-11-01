@@ -1,5 +1,8 @@
 // Custom Next.js server with Socket.io for WebSocket support
 
+// IMPORTANT: Import env first to load environment variables
+import './src/lib/env';
+
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
@@ -66,7 +69,7 @@ app.prepare().then(() => {
         return;
       }
 
-      // Set up listeners for this verification job
+      // Set up listeners for verification updates
       const unsubscribeUpdate = storage.onUpdate((result: VerificationResult) => {
         if (result.doc_id === doc_id) {
           const message: WSServerMessage = {
@@ -116,7 +119,10 @@ app.prepare().then(() => {
       );
 
       // Start verification job in background
-      // Use sequential mode with small delay to make updates more visible
+      console.log(
+        `[WebSocket] Starting verification job for ${doc_id} with ${paragraphs.length} paragraphs`
+      );
+      // Use sequential processing with 1s delay to avoid OpenAI rate limits
       startVerificationJob(doc_id, paragraphs, true, 1000);
 
       // Send acknowledgment
@@ -124,10 +130,6 @@ app.prepare().then(() => {
         doc_id,
         paragraph_count: paragraphs.length,
       });
-
-      console.log(
-        `[WebSocket] Started verification job for ${doc_id} with ${paragraphs.length} paragraphs`
-      );
     });
 
     // Handle get_results request

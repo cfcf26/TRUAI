@@ -1,9 +1,10 @@
+import { SCRAPINGBEE_API_KEY } from './env';
 import { ScrapingBeeClient } from 'scrapingbee';
 
 /**
  * ScrapingBee 클라이언트 인스턴스
  */
-const client = new ScrapingBeeClient(process.env.SCRAPINGBEE_API_KEY || '');
+const client = new ScrapingBeeClient(SCRAPINGBEE_API_KEY);
 
 /**
  * ScrapingBee를 사용하여 URL의 HTML을 가져옵니다.
@@ -15,7 +16,7 @@ const client = new ScrapingBeeClient(process.env.SCRAPINGBEE_API_KEY || '');
  */
 export async function fetchHtml(url: string, renderJs = true): Promise<string> {
   // API 키 확인
-  if (!process.env.SCRAPINGBEE_API_KEY) {
+  if (!SCRAPINGBEE_API_KEY) {
     throw new Error('SCRAPINGBEE_API_KEY is not set in environment variables');
   }
 

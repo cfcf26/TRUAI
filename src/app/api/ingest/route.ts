@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchHtml } from '@/lib/scraper';
 import { parseHtmlToParagraphs } from '@/lib/parser';
 import { IngestRequest, IngestResponse } from '@/types/ingest';
-import { startVerificationJob } from '@/lib/verification';
 
 /**
  * POST /api/ingest
  *
  * 리서치 URL을 받아서 문단 단위로 파싱하여 반환합니다.
- * Backend Logic 1 (Ingest/Parse) 엔드포인트
+ * Backend Logic 1 (Ingest/Parse) 엔드포인트 - 파싱만 수행
+ * 검증은 WebSocket 연결 후 시작됨
  *
  * @param request - { url: string }
  * @returns IngestResponse - { doc_id, source_url, paragraphs[] }
@@ -54,9 +54,7 @@ export async function POST(request: NextRequest) {
     };
 
     console.log(`[Ingest] Success: ${paragraphs.length} paragraphs extracted`);
-
-    // Backend Logic 2: 백그라운드에서 검증 작업 시작
-    startVerificationJob(doc_id, paragraphs);
+    console.log(`[Ingest] Returning parsed data. Verification will start when WebSocket connects.`);
 
     return NextResponse.json(response);
 

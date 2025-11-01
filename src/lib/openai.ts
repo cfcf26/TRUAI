@@ -1,13 +1,12 @@
 // GPT-5 integration for content verification
 
+import { OPENAI_API_KEY } from './env';
 import OpenAI from 'openai';
 import type {
   GPT5VerificationInput,
   GPT5VerificationOutput,
   Confidence,
 } from './types';
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -99,9 +98,9 @@ export async function verifyWithGPT5(
 
     const prompt = createVerificationPrompt(input);
 
-    // Call GPT-5 (or fallback to gpt-4-turbo if GPT-5 is not available)
+    // Call GPT-4o-mini (most cost-effective model)
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5', // Will try GPT-5, fallback to gpt-4-turbo if needed
+      model: 'gpt-4o-mini', // Using GPT-4o-mini for maximum cost efficiency (17x cheaper than GPT-4o)
       messages: [
         {
           role: 'system',
