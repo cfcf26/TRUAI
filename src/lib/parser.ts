@@ -1,6 +1,20 @@
 import * as cheerio from 'cheerio';
 import { ParsedContent, ReferenceLink, Paragraph } from '@/types/ingest';
 
+interface DeepResearchMessage {
+  content?: {
+    parts?: unknown[];
+  };
+  metadata?: {
+    content_references?: DeepResearchReference[];
+  };
+}
+
+interface DeepResearchReference {
+  matched_text?: string;
+  url?: string;
+}
+
 /**
  * HTML을 파싱하여 본문과 출처/주석 영역을 분리합니다.
  *
@@ -13,6 +27,21 @@ export function parseHtml(html: string): ParsedContent {
   // Script, style 태그 제거
   $('script, style, noscript').remove();
 
+  // ChatGPT/Gemini 딥리서치 페이지 감지
+  const isChatGPTDeepResearch = $('[data-message-author-role="assistant"]').length > 0;
+
+  if (isChatGPTDeepResearch) {
+    // ChatGPT 딥리서치 구조: data-message-author-role="assistant" 안의 콘텐츠
+    const assistantMessage = $('[data-message-author-role="assistant"]').first();
+    return {
+      mainContent: assistantMessage.html() || '',
+      references: '',
+      rawHtml: html,
+      isDeepResearch: true,
+    };
+  }
+
+  // 일반 웹페이지 파싱 (기존 로직)
   // 출처/주석 영역 찾기 (여러 패턴 시도)
   let referencesSection = '';
   const referenceSelectors = [
@@ -64,6 +93,7 @@ export function parseHtml(html: string): ParsedContent {
     mainContent,
     references: referencesSection,
     rawHtml: html,
+    isDeepResearch: false,
   };
 }
 
@@ -319,6 +349,333 @@ export function matchParagraphLinks(
 }
 
 /**
+ * ChatGPT Deep Research 공유 페이지에서 문단을 추출합니다.
+ *
+ * @param rawHtml - 원본 HTML 문자열
+ * @returns Paragraph 배열
+ */
+function parseDeepResearchParagraphs(rawHtml: string): Paragraph[] {
+  try {
+    const flightPayload = extractDeepResearchFlightPayload(rawHtml);
+    if (!flightPayload) {
+      return [];
+    }
+
+    const root = resolveFlightPayload(flightPayload);
+    const messages = findDeepResearchMessages(root);
+
+    if (messages.length === 0) {
+      return [];
+    }
+
+    const targetMessage = messages[0];
+    const parts = Array.isArray(targetMessage.content?.parts)
+      ? targetMessage.content.parts.filter((part: unknown): part is string => typeof part === 'string')
+      : [];
+
+    if (parts.length === 0) {
+      return [];
+    }
+
+    const markdown = parts.join('\n\n');
+    const references: DeepResearchReference[] = Array.isArray(targetMessage.metadata?.content_references)
+      ? (targetMessage.metadata?.content_references as DeepResearchReference[])
+      : [];
+    const referenceMap = buildReferenceMap(references);
+    const rawParagraphs = splitMarkdownIntoParagraphs(markdown);
+
+    const paragraphs: Paragraph[] = [];
+    let order = 1;
+
+    for (const paragraph of rawParagraphs) {
+      const { text, links } = processDeepResearchParagraph(paragraph, referenceMap);
+      if (!text) {
+        continue;
+      }
+
+      paragraphs.push({
+        id: order,
+        order,
+        text,
+        links,
+      });
+      order += 1;
+    }
+
+    return paragraphs;
+  } catch (error) {
+    console.warn('[parser] Failed to parse Deep Research payload:', error);
+    return [];
+  }
+}
+
+/**
+ * Deep Research Flight Payload를 추출합니다.
+ *
+ * @param rawHtml - 원본 HTML
+ */
+function extractDeepResearchFlightPayload(rawHtml: string): unknown[] | null {
+  const marker = 'window.__reactRouterContext.streamController.enqueue';
+  const markerIndex = rawHtml.indexOf(marker);
+  if (markerIndex === -1) {
+    return null;
+  }
+
+  const callStart = rawHtml.indexOf('(', markerIndex);
+  if (callStart === -1) {
+    return null;
+  }
+
+  const callEnd = rawHtml.indexOf(');', callStart);
+  if (callEnd === -1) {
+    return null;
+  }
+
+  const argumentSlice = rawHtml.slice(callStart + 1, callEnd);
+
+  try {
+    const firstParse = JSON.parse(argumentSlice);
+    const secondParse = JSON.parse(firstParse);
+    return Array.isArray(secondParse) ? secondParse : null;
+  } catch (error) {
+    console.warn('[parser] Unable to decode Deep Research flight payload:', error);
+    return null;
+  }
+}
+
+/**
+ * Flight Payload를 재귀적으로 해석하여 실제 객체 구조를 복원합니다.
+ *
+ * @param payload - Flight Payload 배열
+ */
+function resolveFlightPayload(payload: unknown[]): unknown {
+  const cache = new Map<number, unknown>();
+
+  const resolveIndex = (index: number): unknown => {
+    if (cache.has(index)) {
+      return cache.get(index);
+    }
+
+    cache.set(index, null);
+    const raw = payload[index];
+    if (typeof raw === 'undefined') {
+      return null;
+    }
+    const resolved = resolveValue(raw);
+    cache.set(index, resolved);
+    return resolved;
+  };
+
+  const resolveValue = (value: unknown): unknown => {
+    if (value === null) {
+      return null;
+    }
+
+    if (typeof value === 'number') {
+      if (value >= 0) {
+        return resolveIndex(value);
+      }
+      // React Flight에서 사용하는 특별한 토큰
+      if (value === -1) {
+        return null;
+      }
+      if (value === -5) {
+        return {};
+      }
+      if (value === -7) {
+        return [];
+      }
+      return null;
+    }
+
+    if (typeof value !== 'object') {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => resolveValue(item));
+    }
+
+    const result: Record<string, unknown> = {};
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      let actualKey = key;
+      if (key.startsWith('_')) {
+        const keyIndex = Number(key.slice(1));
+        const resolvedKey = resolveIndex(keyIndex);
+        if (typeof resolvedKey === 'string') {
+          actualKey = resolvedKey;
+        }
+      }
+      result[actualKey] = resolveValue(nested);
+    }
+
+    return result;
+  };
+
+  return resolveIndex(0);
+}
+
+/**
+ * Deep Research 메시지를 탐색합니다.
+ *
+ * @param root - 복원된 Flight 객체 루트
+ */
+function findDeepResearchMessages(root: unknown): DeepResearchMessage[] {
+  const results: DeepResearchMessage[] = [];
+  const visited = new WeakSet<object>();
+
+  const traverse = (node: unknown): void => {
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+
+    if (visited.has(node as object)) {
+      return;
+    }
+
+    visited.add(node as object);
+
+    if (Array.isArray(node)) {
+      node.forEach(traverse);
+      return;
+    }
+
+    const candidate = node as DeepResearchMessage;
+    const hasContentParts = Array.isArray(candidate.content?.parts);
+    const hasReferences = Array.isArray(candidate.metadata?.content_references);
+
+    if (hasContentParts && hasReferences) {
+      results.push(candidate);
+    }
+
+    Object.values(node as Record<string, unknown>).forEach(traverse);
+  };
+
+  traverse(root);
+  return results;
+}
+
+/**
+ * citations 배열을 빠르게 조회할 수 있도록 Map 형태로 변환합니다.
+ *
+ * @param references - Deep Research content_references
+ */
+function buildReferenceMap(references: DeepResearchReference[]): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  for (const ref of references) {
+    const matched = typeof ref?.matched_text === 'string' ? ref.matched_text.trim() : null;
+    const url = typeof ref?.url === 'string' ? ref.url.trim() : null;
+
+    if (!matched || !url) {
+      continue;
+    }
+
+    if (!map.has(matched)) {
+      map.set(matched, new Set<string>());
+    }
+
+    map.get(matched)!.add(url);
+  }
+
+  return map;
+}
+
+/**
+ * 마크다운 본문을 문단 단위로 분리합니다.
+ *
+ * @param markdown - 원본 마크다운 문자열
+ */
+function splitMarkdownIntoParagraphs(markdown: string): string[] {
+  const sections = markdown
+    .split(/\n{2,}/)
+    .map((section) => section.trim())
+    .filter((section) => section.length > 0);
+
+  const paragraphs: string[] = [];
+
+  for (const section of sections) {
+    const lines = section
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    if (lines.length === 0) {
+      continue;
+    }
+
+    const isList = lines.every((line) => /^([-*+]\s+|\d+\.\s+)/.test(line));
+    if (isList) {
+      lines.forEach((line) => {
+        const normalized = line.replace(/^([-*+]\s+|\d+\.\s+)/, '').trim();
+        if (normalized.length > 0) {
+          paragraphs.push(normalized);
+        }
+      });
+    } else {
+      paragraphs.push(lines.join(' '));
+    }
+  }
+
+  return paragraphs;
+}
+
+/**
+ * 마크다운 문단을 정제하고 링크를 매핑합니다.
+ *
+ * @param paragraph - 원본 문단
+ * @param referenceMap - citation → url 매핑
+ */
+function processDeepResearchParagraph(
+  paragraph: string,
+  referenceMap: Map<string, Set<string>>
+): { text: string; links: string[] } {
+  const citationPattern = /【[^】]+】/g;
+  const matches = paragraph.match(citationPattern) || [];
+  const linkSet = new Set<string>();
+
+  for (const match of matches) {
+    const normalized = match.trim();
+    const urls = referenceMap.get(normalized);
+    if (!urls) {
+      continue;
+    }
+    urls.forEach((url) => linkSet.add(url));
+  }
+
+  const withoutCitations = paragraph.replace(citationPattern, ' ').trim();
+  const cleanedText = cleanMarkdown(withoutCitations);
+
+  return {
+    text: cleanedText,
+    links: Array.from(linkSet),
+  };
+}
+
+/**
+ * 간단한 마크다운 포맷팅을 제거합니다.
+ *
+ * @param text - 정제할 텍스트
+ */
+function cleanMarkdown(text: string): string {
+  return text
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '') // 이미지
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1') // 링크 텍스트만 남기기
+    .replace(/`([^`]+)`/g, '$1') // 인라인 코드 제거
+    .replace(/\*\*(.*?)\*\*/g, '$1') // 굵게
+    .replace(/\*(.*?)\*/g, '$1') // 기울임
+    .replace(/__(.*?)__/g, '$1') // 굵게(언더스코어)
+    .replace(/_(.*?)_/g, '$1') // 기울임(언더스코어)
+    .replace(/\*\*/g, '') // 남은 별표 제거
+    .replace(/__/g, '') // 남은 언더스코어 제거
+    .replace(/`/g, '') // 남은 백틱 제거
+    .replace(/^>\s*/gm, '') // 인용부호
+    .replace(/^#+\s*/gm, '') // 헤딩 기호 제거
+    .replace(/\s+/g, ' ') // 공백 정리
+    .replace(/\s+([,.!?;:])/g, '$1') // 문장부호 앞 공백 제거
+    .trim();
+}
+
+/**
  * HTML 전체를 파싱하여 문단 배열을 생성합니다.
  * Backend Logic 1의 핵심 함수: HTML → Paragraph[] 변환
  *
@@ -327,13 +684,20 @@ export function matchParagraphLinks(
  */
 export function parseHtmlToParagraphs(html: string): Paragraph[] {
   // 1. HTML 파싱: 본문 vs 출처 분리
-  const { mainContent, references } = parseHtml(html);
+  const parsed = parseHtml(html);
+
+  if (parsed.isDeepResearch) {
+    const deepResearchParagraphs = parseDeepResearchParagraphs(parsed.rawHtml);
+    if (deepResearchParagraphs.length > 0) {
+      return deepResearchParagraphs;
+    }
+  }
 
   // 2. 출처 섹션에서 링크 추출
-  const referenceLinks = extractReferenceLinks(references);
+  const referenceLinks = extractReferenceLinks(parsed.references);
 
   // 3. 본문을 문단 단위로 분할
-  const paragraphBlocks = splitIntoParagraphs(mainContent);
+  const paragraphBlocks = splitIntoParagraphs(parsed.mainContent);
 
   // 4. 각 문단에 출처 링크 매칭
   const paragraphs: Paragraph[] = paragraphBlocks.map((block, index) => {

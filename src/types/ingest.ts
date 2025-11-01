@@ -44,6 +44,8 @@ export interface ParsedContent {
   references: string;
   /** 전체 HTML */
   rawHtml: string;
+  /** ChatGPT Deep Research 공유 페이지 여부 */
+  isDeepResearch?: boolean;
 }
 
 /**
