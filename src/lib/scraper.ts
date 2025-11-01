@@ -1,4 +1,4 @@
-import ScrapingBeeClient from 'scrapingbee';
+import { ScrapingBeeClient } from 'scrapingbee';
 
 /**
  * ScrapingBee 클라이언트 인스턴스
