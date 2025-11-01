@@ -4,15 +4,43 @@ import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-van
 import { GooeyText } from "@/components/ui/gooey-text-morphing";
 import { AuroraBackground } from "@/components/ui/aurora-background";
 import { ContentAnalyzer } from "@/components/ContentAnalyzer";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AnalyzedContent } from "@/types/content";
-import { getMockAnalyzedContent } from "@/utils/mockData";
+import { useVerification } from "@/hooks/useVerification";
+import { documentToAnalyzedContent, updateParagraphWithResult } from "@/utils/typeAdapter";
+import { Paragraph } from "@/lib/types";
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [analyzedContent, setAnalyzedContent] = useState<AnalyzedContent | null>(null);
   const [inputValue, setInputValue] = useState("");
+  const [currentDocId, setCurrentDocId] = useState<string | null>(null);
+  const [paragraphs, setParagraphs] = useState<Paragraph[]>([]);
+
+  // WebSocket connection for real-time verification updates
+  const verification = useVerification({
+    onUpdate: useCallback((result) => {
+      console.log('[UI] Received verification update:', result);
+
+      setAnalyzedContent((prev) => {
+        if (!prev) return prev;
+
+        const paragraph = paragraphs.find(p => p.id === result.paragraph_id);
+        if (!paragraph) return prev;
+
+        return updateParagraphWithResult(prev, paragraph, result);
+      });
+    }, [paragraphs]),
+
+    onComplete: useCallback((docId) => {
+      console.log('[UI] Verification complete for:', docId);
+    }, []),
+
+    onError: useCallback((error) => {
+      console.error('[UI] Verification error:', error);
+    }, []),
+  });
 
   const placeholders = [
     "논문 URL을 입력하세요...",
@@ -26,19 +54,51 @@ export default function Home() {
     setInputValue(e.target.value);
   };
 
-  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (inputValue.trim()) {
-      setIsLoading(true);
-      setAnalyzedContent(null);
+    if (!inputValue.trim()) return;
 
-      // Simulate API call with 5 second delay
-      setTimeout(() => {
-        setAnalyzedContent(getMockAnalyzedContent());
-        setIsLoading(false);
-      }, 5000);
+    setIsLoading(true);
+    setAnalyzedContent(null);
 
-      console.log("Submitted URL:", inputValue);
+    try {
+      console.log('[UI] Submitting URL to /api/ingest:', inputValue);
+
+      // Call Backend Logic 1 (Ingest/Parse)
+      const response = await fetch('/api/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: inputValue }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to ingest URL');
+      }
+
+      const data = await response.json();
+      console.log('[UI] Received parsed document:', data);
+
+      const { doc_id, source_url, paragraphs: parsedParagraphs } = data;
+
+      // Store doc_id and paragraphs for later reference
+      setCurrentDocId(doc_id);
+      setParagraphs(parsedParagraphs);
+
+      // Convert to UI format and display immediately
+      const initialContent = documentToAnalyzedContent(source_url, parsedParagraphs);
+      setAnalyzedContent(initialContent);
+      setIsLoading(false);
+
+      // Start real-time verification via WebSocket
+      // (Backend Logic 2 is already running in background,
+      // but we connect to receive updates)
+      verification.startVerification(doc_id, parsedParagraphs);
+
+    } catch (error) {
+      console.error('[UI] Error ingesting URL:', error);
+      setIsLoading(false);
+      alert(error instanceof Error ? error.message : 'Failed to process URL');
     }
   };
 
