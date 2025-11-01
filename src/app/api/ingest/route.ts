@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchHtml } from '@/lib/scraper';
 import { parseHtmlToParagraphs } from '@/lib/parser';
 import { IngestRequest, IngestResponse } from '@/types/ingest';
+import { startVerificationJob } from '@/lib/verification';
 
 /**
  * POST /api/ingest
@@ -54,8 +55,9 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Ingest] Success: ${paragraphs.length} paragraphs extracted`);
 
-    // TODO: Backend Logic 2에 검증 작업 요청 (job queue 등)
-    // await triggerVerificationJob(doc_id, paragraphs);
+    // Backend Logic 2: 검증 작업 시작 (백그라운드에서 비동기 실행)
+    console.log(`[Ingest] Triggering verification job for ${doc_id}`);
+    startVerificationJob(doc_id, paragraphs, 0); // 0ms delay - 즉시 시작
 
     return NextResponse.json(response);
 
