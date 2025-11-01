@@ -11,5 +11,6 @@ export interface ParagraphAnalysis {
 
 export interface AnalyzedContent {
   title: string;
+  sourceUrl: string;
   paragraphs: ParagraphAnalysis[];
 }

@@ -32,11 +32,42 @@ export default function Home() {
       setIsLoading(true);
       setAnalyzedContent(null);
 
-      // Simulate API call with 5 second delay
-      setTimeout(() => {
-        setAnalyzedContent(getMockAnalyzedContent());
-        setIsLoading(false);
-      }, 5000);
+      fetch("/api/ingest", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: inputValue }),
+      })
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error("Network response was not ok");
+          }
+          return res.json();
+        })
+        .then((data) => {
+          // 데이터 구조 변환 (백엔드 -> 프론트엔드)
+          const transformedContent: AnalyzedContent = {
+            title: `분석 결과: ${data.source_url}`,
+            sourceUrl: data.source_url,
+            paragraphs: data.paragraphs.map((p: any) => ({
+              id: p.id,
+              content: p.text,
+              confidenceLevel: "medium", // 초기 상태는 '분석중'
+              confidence: 50, // 초기 값
+              sources: p.links,
+              reasoning: "현재 문단에 대한 신뢰도를 분석하고 있습니다...",
+            })),
+          };
+          setAnalyzedContent(transformedContent);
+        })
+        .catch((error) => {
+          console.error("Error fetching analysis:", error);
+          // TODO: 사용자에게 에러 메시지 표시
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
 
       console.log("Submitted URL:", inputValue);
     }
