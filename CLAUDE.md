@@ -132,3 +132,29 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed API schemas and da
 - The `cn()` utility function in `@/lib/utils` should be used for conditional className merging
 - All UI components follow the shadcn/ui pattern with variant-based styling using class-variance-authority
 - For real-time updates, consider SSE/WebSocket or polling (initial implementation can use 3s polling)
+
+## Working with Claude Code Agents
+
+When working on this project with Claude Code, leverage specialized agents for better efficiency:
+
+- **Exploration Tasks**: Use the `Explore` agent (Task tool with subagent_type=Explore) when:
+  - Searching for how specific features are implemented across the codebase
+  - Understanding the overall codebase structure
+  - Finding patterns or conventions used in the project
+  - Locating files related to a particular functionality
+
+- **Planning Tasks**: Use the `Plan` agent for:
+  - Breaking down complex feature implementations
+  - Planning multi-step refactoring operations
+  - Designing new API endpoints or components
+
+- **Build & Validation**: Use the `build-lint-validator` agent to:
+  - Run build checks after significant code changes
+  - Validate TypeScript and linting rules
+  - Ensure code quality before commits
+
+- **Git Operations**: Use the `git-commit-pusher` agent when:
+  - Committing completed features with proper commit messages
+  - Preparing code for pull requests
+
+Always prefer using these specialized agents over running individual search or build commands directly, as they provide more comprehensive and efficient results.
