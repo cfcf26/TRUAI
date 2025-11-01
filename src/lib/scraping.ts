@@ -2,6 +2,14 @@
 
 import * as cheerio from 'cheerio';
 import type { SourceContent } from './types';
+import {
+  sourceContentCache,
+  credibilityCache,
+  normalizeUrl,
+  extractDomain,
+  recordCacheHit,
+  recordCacheMiss,
+} from './cache';
 
 const SCRAPINGBEE_API_KEY = process.env.SCRAPINGBEE_API_KEY || '';
 const SCRAPING_TIMEOUT = 15000; // 15 seconds
@@ -47,39 +55,58 @@ const NEWS_DOMAINS = [
 
 /**
  * Evaluates the credibility of a source based on its domain
+ * Uses cache to avoid redundant evaluations
  */
 export function evaluateCredibility(
   url: string
 ): 'academic' | 'official' | 'news' | 'blog' | 'unknown' {
   try {
-    const domain = new URL(url).hostname.toLowerCase();
+    // Extract domain for cache key
+    const domain = extractDomain(url);
+
+    // Check cache first
+    const cached = credibilityCache.get(domain);
+    if (cached !== undefined) {
+      recordCacheHit('credibility');
+      return cached;
+    }
+
+    // Cache miss - perform evaluation
+    recordCacheMiss('credibility');
+
+    const hostname = new URL(url).hostname.toLowerCase();
+
+    let credibility: 'academic' | 'official' | 'news' | 'blog' | 'unknown';
 
     // Check academic
-    if (ACADEMIC_DOMAINS.some((d) => domain.includes(d))) {
-      return 'academic';
+    if (ACADEMIC_DOMAINS.some((d) => hostname.includes(d))) {
+      credibility = 'academic';
     }
-
     // Check official
-    if (OFFICIAL_DOMAINS.some((d) => domain.endsWith(d) || domain.includes(d))) {
-      return 'official';
+    else if (OFFICIAL_DOMAINS.some((d) => hostname.endsWith(d) || hostname.includes(d))) {
+      credibility = 'official';
     }
-
     // Check news
-    if (NEWS_DOMAINS.some((d) => domain.includes(d))) {
-      return 'news';
+    else if (NEWS_DOMAINS.some((d) => hostname.includes(d))) {
+      credibility = 'news';
     }
-
     // Check for blog platforms
-    if (
-      domain.includes('medium.com') ||
-      domain.includes('blogger.com') ||
-      domain.includes('wordpress.com') ||
-      domain.includes('substack.com')
+    else if (
+      hostname.includes('medium.com') ||
+      hostname.includes('blogger.com') ||
+      hostname.includes('wordpress.com') ||
+      hostname.includes('substack.com')
     ) {
-      return 'blog';
+      credibility = 'blog';
+    }
+    else {
+      credibility = 'unknown';
     }
 
-    return 'unknown';
+    // Store in cache
+    credibilityCache.set(domain, credibility);
+
+    return credibility;
   } catch {
     return 'unknown';
   }
@@ -124,24 +151,43 @@ function extractContent($: cheerio.CheerioAPI): string {
 
 /**
  * Scrapes a URL using ScrapingBee
+ * Uses cache to avoid redundant API calls
  */
 export async function scrapeUrl(url: string): Promise<SourceContent> {
   try {
     // Validate URL
     new URL(url);
 
+    // Normalize URL for consistent cache keys
+    const cacheKey = normalizeUrl(url);
+
+    // Check cache first
+    const cached = sourceContentCache.get(cacheKey);
+    if (cached) {
+      recordCacheHit('sourceContent');
+      console.log(`[CACHE HIT] Source content for: ${url}`);
+      return cached;
+    }
+
+    // Cache miss - proceed with scraping
+    recordCacheMiss('sourceContent');
+    console.log(`[CACHE MISS] Scraping: ${url}`);
+
     const credibility = evaluateCredibility(url);
 
     // Check if API key is available
     if (!SCRAPINGBEE_API_KEY) {
       console.warn('ScrapingBee API key not configured, returning mock data');
-      return {
+      const mockResult = {
         url,
         title: 'Mock Title - ScrapingBee not configured',
         content: 'Mock content for URL: ' + url,
         credibility,
         error: 'ScrapingBee API key not configured',
       };
+      // Cache mock results too
+      sourceContentCache.set(cacheKey, mockResult);
+      return mockResult;
     }
 
     // Build ScrapingBee API URL
@@ -170,22 +216,33 @@ export async function scrapeUrl(url: string): Promise<SourceContent> {
     const title = extractTitle($, url);
     const content = extractContent($);
 
-    return {
+    const result: SourceContent = {
       url,
       title,
       content,
       credibility,
     };
+
+    // Store in cache
+    sourceContentCache.set(cacheKey, result);
+
+    return result;
   } catch (error) {
     console.error(`Error scraping ${url}:`, error);
 
-    return {
+    const errorResult: SourceContent = {
       url,
       title: url,
       content: '',
       credibility: evaluateCredibility(url),
       error: error instanceof Error ? error.message : 'Unknown error',
     };
+
+    // Cache error results too (with shorter TTL implicitly handled by LRU)
+    const cacheKey = normalizeUrl(url);
+    sourceContentCache.set(cacheKey, errorResult);
+
+    return errorResult;
   }
 }
 

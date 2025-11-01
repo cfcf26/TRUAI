@@ -6,6 +6,12 @@ import type {
   GPTVerificationOutput,
   Confidence,
 } from './types';
+import {
+  gptVerificationCache,
+  generateGPTCacheKey,
+  recordCacheHit,
+  recordCacheMiss,
+} from './cache';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
@@ -81,13 +87,30 @@ Now, analyze the paragraph and provide your JSON response:`;
 
 /**
  * Verifies a paragraph against its sources using GPT
+ * Uses cache to avoid redundant API calls
  */
 export async function verifyWithGPT(
   input: GPTVerificationInput
 ): Promise<GPTVerificationOutput> {
   try {
+    // Generate cache key from input
+    const cacheKey = generateGPTCacheKey(input);
+
+    // Check cache first
+    const cached = gptVerificationCache.get(cacheKey);
+    if (cached) {
+      recordCacheHit('gptVerification');
+      console.log('[CACHE HIT] GPT verification result');
+      return cached;
+    }
+
+    // Cache miss - proceed with GPT call
+    recordCacheMiss('gptVerification');
+    console.log('[CACHE MISS] Calling GPT for verification');
+
     if (!OPENAI_API_KEY) {
       console.warn('OpenAI API key not configured, returning mock response');
+      // Don't cache mock responses
       return {
         confidence: 'low',
         summary_of_sources:
@@ -140,14 +163,20 @@ export async function verifyWithGPT(
       throw new Error(`Invalid confidence value: ${result.confidence}`);
     }
 
-    return {
+    const verificationResult: GPTVerificationOutput = {
       confidence: result.confidence as Confidence,
       summary_of_sources: result.summary_of_sources,
       reasoning: result.reasoning,
     };
+
+    // Store successful result in cache
+    gptVerificationCache.set(cacheKey, verificationResult);
+
+    return verificationResult;
   } catch (error) {
     console.error('Error calling GPT:', error);
 
+    // Don't cache error results - let retry logic handle it
     // Return low confidence with error explanation
     return {
       confidence: 'low',
