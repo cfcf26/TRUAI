@@ -4,7 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TruAI is a Next.js 14 application built with TypeScript, Tailwind CSS, and shadcn/ui component library. The project uses the App Router architecture and follows modern React Server Components patterns.
+TruAI is a fact-checking and source verification system that analyzes deep research URLs, extracts content into paragraphs, and verifies the credibility of each paragraph against its cited sources using AI.
+
+**Core Functionality:**
+- Accepts research article URLs and parses them into structured paragraphs with source links
+- Performs real-time verification of each paragraph against its cited sources
+- Provides confidence ratings (high/medium/low) with detailed reasoning
+- Displays results with an interactive UI that updates as verification completes
+
+**Technical Stack:**
+- Next.js 14 with TypeScript and App Router
+- Tailwind CSS + shadcn/ui for UI components
+- ScrapingBee for web scraping
+- GPT-5 for content verification and confidence assessment
+
+For detailed architecture and data flow, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Development Commands
 
@@ -85,8 +99,36 @@ The app uses Geist font family (Sans and Mono) loaded as local fonts via `next/f
 - **Styling**: class-variance-authority, clsx, tailwind-merge
 - **Type Safety**: Full TypeScript coverage with strict mode
 
+## Application Architecture
+
+The system follows a three-layer architecture:
+
+1. **UI Layer**: Displays parsed paragraphs and real-time confidence updates
+   - Shows paragraph cards with color-coded confidence levels (green/yellow/red)
+   - Provides tooltips with source details and verification reasoning
+   - Updates incrementally as backend verification completes
+
+2. **Backend Logic 1 (Ingest/Parse)**: `/api/ingest`
+   - Receives research URL
+   - Scrapes content via ScrapingBee
+   - Separates main content from references/citations
+   - Maps paragraphs to their source links
+   - Returns structured data immediately to UI
+   - Triggers background verification job
+
+3. **Backend Logic 2 (Verification)**: Background worker
+   - Crawls up to 5 source links per paragraph (parallel)
+   - Feeds paragraph + source content to GPT-5
+   - Generates confidence rating and reasoning
+   - Streams results back to UI incrementally
+
+### Key API Contracts
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed API schemas and data structures.
+
 ## Development Notes
 
 - This is a Server Component-first architecture; use 'use client' directive only when necessary
 - The `cn()` utility function in `@/lib/utils` should be used for conditional className merging
 - All UI components follow the shadcn/ui pattern with variant-based styling using class-variance-authority
+- For real-time updates, consider SSE/WebSocket or polling (initial implementation can use 3s polling)
