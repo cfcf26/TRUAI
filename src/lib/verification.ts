@@ -177,29 +177,19 @@ export async function verifyDocumentSequential(
 export function startVerificationJob(
   docId: string,
   paragraphs: Paragraph[],
-  sequential = false,
   delayMs = 0
 ): void {
   console.log(
-    `[Verification] Starting background verification job for ${docId}`
+    `[Verification] Starting background verification job for ${docId} (sequential)`
   );
 
   // Run verification in background (don't await)
-  if (sequential) {
-    verifyDocumentSequential(docId, paragraphs, delayMs).catch((error) => {
-      console.error(
-        `[Verification] Background job failed for ${docId}:`,
-        error
-      );
-    });
-  } else {
-    verifyDocument(docId, paragraphs).catch((error) => {
-      console.error(
-        `[Verification] Background job failed for ${docId}:`,
-        error
-      );
-    });
-  }
+  verifyDocumentSequential(docId, paragraphs, delayMs).catch((error) => {
+    console.error(
+      `[Verification] Background job failed for ${docId}:`,
+      error
+    );
+  });
 }
 
 /**

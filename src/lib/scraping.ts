@@ -190,14 +190,16 @@ export async function scrapeUrl(url: string): Promise<SourceContent> {
 }
 
 /**
- * Scrapes multiple URLs in parallel with a limit of 5
+ * Scrapes multiple URLs sequentially with a limit of 5
  */
 export async function scrapeUrls(urls: string[]): Promise<SourceContent[]> {
   // Limit to 5 URLs as per ARCHITECTURE.md
   const limitedUrls = urls.slice(0, 5);
+  const results: SourceContent[] = [];
 
-  // Scrape all URLs in parallel
-  const results = await Promise.all(limitedUrls.map((url) => scrapeUrl(url)));
+  for (const url of limitedUrls) {
+    results.push(await scrapeUrl(url));
+  }
 
   return results;
 }
