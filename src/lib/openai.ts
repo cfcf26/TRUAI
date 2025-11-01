@@ -1,9 +1,9 @@
-// GPT-5 integration for content verification
+// GPT integration for content verification
 
 import OpenAI from 'openai';
 import type {
-  GPT5VerificationInput,
-  GPT5VerificationOutput,
+  GPTVerificationInput,
+  GPTVerificationOutput,
   Confidence,
 } from './types';
 
@@ -15,9 +15,9 @@ const openai = new OpenAI({
 });
 
 /**
- * Creates the verification prompt for GPT-5
+ * Creates the verification prompt for GPT
  */
-function createVerificationPrompt(input: GPT5VerificationInput): string {
+function createVerificationPrompt(input: GPTVerificationInput): string {
   const { paragraph_text, paragraph_links, sources } = input;
 
   // Build sources section
@@ -80,11 +80,11 @@ Now, analyze the paragraph and provide your JSON response:`;
 }
 
 /**
- * Verifies a paragraph against its sources using GPT-5
+ * Verifies a paragraph against its sources using GPT
  */
-export async function verifyWithGPT5(
-  input: GPT5VerificationInput
-): Promise<GPT5VerificationOutput> {
+export async function verifyWithGPT(
+  input: GPTVerificationInput
+): Promise<GPTVerificationOutput> {
   try {
     if (!OPENAI_API_KEY) {
       console.warn('OpenAI API key not configured, returning mock response');
@@ -99,9 +99,9 @@ export async function verifyWithGPT5(
 
     const prompt = createVerificationPrompt(input);
 
-    // Call GPT-5 (or fallback to gpt-4-turbo if GPT-5 is not available)
+    // Call GPT using GPT-4o mini model
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5', // Will try GPT-5, fallback to gpt-4-turbo if needed
+      model: 'gpt-4o-mini', // GPT-4o mini model
       messages: [
         {
           role: 'system',
@@ -120,7 +120,7 @@ export async function verifyWithGPT5(
     const responseText = completion.choices[0]?.message?.content;
 
     if (!responseText) {
-      throw new Error('Empty response from GPT-5');
+      throw new Error('Empty response from GPT');
     }
 
     // Parse JSON response
@@ -132,7 +132,7 @@ export async function verifyWithGPT5(
       !result.summary_of_sources ||
       !result.reasoning
     ) {
-      throw new Error('Invalid response structure from GPT-5');
+      throw new Error('Invalid response structure from GPT');
     }
 
     // Validate confidence value
@@ -146,7 +146,7 @@ export async function verifyWithGPT5(
       reasoning: result.reasoning,
     };
   } catch (error) {
-    console.error('Error calling GPT-5:', error);
+    console.error('Error calling GPT:', error);
 
     // Return low confidence with error explanation
     return {
@@ -164,14 +164,14 @@ export async function verifyWithGPT5(
  * Verifies a paragraph with retry logic
  */
 export async function verifyWithRetry(
-  input: GPT5VerificationInput,
+  input: GPTVerificationInput,
   maxRetries = 2
-): Promise<GPT5VerificationOutput> {
+): Promise<GPTVerificationOutput> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const result = await verifyWithGPT5(input);
+      const result = await verifyWithGPT(input);
 
       // If we got a valid result (not an error fallback), return it
       if (result.confidence !== 'low' || !result.reasoning.includes('Error')) {
@@ -207,8 +207,8 @@ export async function verifyWithRetry(
  * Can be optimized later with actual batch API if needed
  */
 export async function batchVerify(
-  inputs: GPT5VerificationInput[]
-): Promise<GPT5VerificationOutput[]> {
+  inputs: GPTVerificationInput[]
+): Promise<GPTVerificationOutput[]> {
   // Process all in parallel
   return Promise.all(inputs.map((input) => verifyWithRetry(input)));
 }

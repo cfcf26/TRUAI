@@ -8,7 +8,7 @@ import type {
   VerificationResult,
   LinkDigest,
   SourceContent,
-  GPT5VerificationInput,
+  GPTVerificationInput,
 } from './types';
 
 /**
@@ -38,21 +38,21 @@ export async function verifyParagraph(
       `[Verification] Scraped ${sources.length} sources for paragraph ${paragraphId}`
     );
 
-    // Step 2: Prepare input for GPT-5 verification
-    const gpt5Input: GPT5VerificationInput = {
+    // Step 2: Prepare input for GPT verification
+    const gptInput: GPTVerificationInput = {
       paragraph_text: text,
       paragraph_links: links,
       sources,
     };
 
-    // Step 3: Call GPT-5 for verification
+    // Step 3: Call GPT for verification
     console.log(
-      `[Verification] Calling GPT-5 for verification of paragraph ${paragraphId}`
+      `[Verification] Calling GPT for verification of paragraph ${paragraphId}`
     );
-    const gpt5Output = await verifyWithRetry(gpt5Input);
+    const gptOutput = await verifyWithRetry(gptInput);
 
     console.log(
-      `[Verification] GPT-5 returned confidence: ${gpt5Output.confidence} for paragraph ${paragraphId}`
+      `[Verification] GPT returned confidence: ${gptOutput.confidence} for paragraph ${paragraphId}`
     );
 
     // Step 4: Create link digests
@@ -68,9 +68,9 @@ export async function verifyParagraph(
     const result: VerificationResult = {
       doc_id: docId,
       paragraph_id: paragraphId,
-      confidence: gpt5Output.confidence,
-      summary_of_sources: gpt5Output.summary_of_sources,
-      reasoning: gpt5Output.reasoning,
+      confidence: gptOutput.confidence,
+      summary_of_sources: gptOutput.summary_of_sources,
+      reasoning: gptOutput.reasoning,
       link_digests: linkDigests,
     };
 

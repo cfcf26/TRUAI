@@ -69,13 +69,13 @@ export interface SourceContent {
   error?: string;
 }
 
-export interface GPT5VerificationInput {
+export interface GPTVerificationInput {
   paragraph_text: string;
   paragraph_links: string[];
   sources: SourceContent[];
 }
 
-export interface GPT5VerificationOutput {
+export interface GPTVerificationOutput {
   confidence: Confidence;
   summary_of_sources: string;
   reasoning: string;

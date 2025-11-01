@@ -16,7 +16,7 @@ TruAI is a fact-checking and source verification system that analyzes deep resea
 - Next.js 14 with TypeScript and App Router
 - Tailwind CSS + shadcn/ui for UI components
 - ScrapingBee for web scraping
-- GPT-5 for content verification and confidence assessment
+- GPT for content verification and confidence assessment
 
 For detailed architecture and data flow, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -118,7 +118,7 @@ The system follows a three-layer architecture:
 
 3. **Backend Logic 2 (Verification)**: Background worker
    - Crawls up to 5 source links per paragraph (parallel)
-   - Feeds paragraph + source content to GPT-5
+   - Feeds paragraph + source content to GPT
    - Generates confidence rating and reasoning
    - Streams results back to UI incrementally
 
