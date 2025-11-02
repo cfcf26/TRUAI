@@ -189,6 +189,8 @@ export function extractInlineLinks(html: string): string[] {
 interface ParagraphBlock {
   html: string;
   text: string;
+  isHeading?: boolean;
+  headingLevel?: number;
 }
 
 /**
@@ -206,16 +208,33 @@ export function splitIntoParagraphs(mainContentHtml: string): ParagraphBlock[] {
   const $ = cheerio.load(mainContentHtml);
   const blocks: ParagraphBlock[] = [];
 
-  // 문단으로 간주할 요소들
-  const paragraphSelectors = ['p', 'li', 'blockquote'];
+  // 헤딩과 문단을 모두 포함하여 DOM 순서대로 처리
+  const contentSelectors = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'blockquote'];
 
-  // 각 요소를 순회하며 문단 블록 생성
-  $(paragraphSelectors.join(', ')).each((_, element) => {
+  // DOM 순서를 유지하면서 각 요소 처리
+  $(contentSelectors.join(', ')).each((_, element) => {
     const $el = $(element);
     const html = $.html($el);
     const text = $el.text().trim();
 
-    if (text.length > 0) {
+    if (text.length === 0) {
+      return; // 빈 요소는 건너뛰기
+    }
+
+    // cheerio Element의 name 속성 사용 (tagName 대신)
+    const tagName = 'name' in element ? (element.name as string).toLowerCase() : '';
+
+    // 헤딩 태그인지 확인
+    if (tagName.startsWith('h') && tagName.length === 2) {
+      const headingLevel = parseInt(tagName.charAt(1)); // 'h1' -> 1, 'h2' -> 2, etc.
+      blocks.push({
+        html,
+        text,
+        isHeading: true,
+        headingLevel
+      });
+    } else {
+      // 일반 문단
       blocks.push({ html, text });
     }
   });
@@ -254,12 +273,21 @@ function postProcessParagraphs(blocks: ParagraphBlock[]): ParagraphBlock[] {
   const processed: ParagraphBlock[] = [];
 
   for (const block of blocks) {
-    // 너무 짧은 문단: 이전 문단에 병합
+    // 헤딩은 병합/분할 없이 그대로 유지
+    if (block.isHeading) {
+      processed.push(block);
+      continue;
+    }
+
+    // 너무 짧은 문단: 이전 문단에 병합 (이전 문단도 헤딩이 아닐 때만)
     if (block.text.length < MIN_LENGTH && processed.length > 0) {
       const prev = processed[processed.length - 1];
-      prev.text = prev.text + ' ' + block.text;
-      prev.html = prev.html + ' ' + block.html;
-      continue;
+      // 이전 블록이 헤딩이 아닐 때만 병합
+      if (!prev.isHeading) {
+        prev.text = prev.text + ' ' + block.text;
+        prev.html = prev.html + ' ' + block.html;
+        continue;
+      }
     }
 
     // 너무 긴 문단: 분할
@@ -387,8 +415,8 @@ function parseDeepResearchParagraphs(rawHtml: string): Paragraph[] {
     const paragraphs: Paragraph[] = [];
     let order = 1;
 
-    for (const paragraph of rawParagraphs) {
-      const { text, links } = processDeepResearchParagraph(paragraph, referenceMap);
+    for (const paragraphBlock of rawParagraphs) {
+      const { text, links } = processDeepResearchParagraph(paragraphBlock.text, referenceMap);
       if (!text) {
         continue;
       }
@@ -398,6 +426,8 @@ function parseDeepResearchParagraphs(rawHtml: string): Paragraph[] {
         order,
         text,
         links,
+        isHeading: paragraphBlock.isHeading,
+        headingLevel: paragraphBlock.headingLevel,
       });
       order += 1;
     }
@@ -581,17 +611,27 @@ function buildReferenceMap(references: DeepResearchReference[]): Map<string, Set
 }
 
 /**
+ * 마크다운 문단 블록 (헤딩 정보 포함)
+ */
+interface MarkdownParagraphBlock {
+  text: string;
+  isHeading?: boolean;
+  headingLevel?: number;
+}
+
+/**
  * 마크다운 본문을 문단 단위로 분리합니다.
+ * 헤딩(#, ##, ### 등)을 감지하여 별도 표시합니다.
  *
  * @param markdown - 원본 마크다운 문자열
  */
-function splitMarkdownIntoParagraphs(markdown: string): string[] {
+function splitMarkdownIntoParagraphs(markdown: string): MarkdownParagraphBlock[] {
   const sections = markdown
     .split(/\n{2,}/)
     .map((section) => section.trim())
     .filter((section) => section.length > 0);
 
-  const paragraphs: string[] = [];
+  const paragraphs: MarkdownParagraphBlock[] = [];
 
   for (const section of sections) {
     const lines = section
@@ -603,16 +643,29 @@ function splitMarkdownIntoParagraphs(markdown: string): string[] {
       continue;
     }
 
+    // 헤딩 감지: # Heading, ## Heading, ### Heading 등
+    const headingMatch = lines[0].match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch && lines.length === 1) {
+      const headingLevel = headingMatch[1].length; // # 개수 = 레벨
+      const headingText = headingMatch[2].trim();
+      paragraphs.push({
+        text: headingText,
+        isHeading: true,
+        headingLevel,
+      });
+      continue;
+    }
+
     const isList = lines.every((line) => /^([-*+]\s+|\d+\.\s+)/.test(line));
     if (isList) {
       lines.forEach((line) => {
         const normalized = line.replace(/^([-*+]\s+|\d+\.\s+)/, '').trim();
         if (normalized.length > 0) {
-          paragraphs.push(normalized);
+          paragraphs.push({ text: normalized });
         }
       });
     } else {
-      paragraphs.push(lines.join(' '));
+      paragraphs.push({ text: lines.join(' ') });
     }
   }
 
@@ -708,6 +761,8 @@ export function parseHtmlToParagraphs(html: string): Paragraph[] {
       order: index + 1,
       text: block.text,
       links,
+      isHeading: block.isHeading,
+      headingLevel: block.headingLevel,
     };
   });
 

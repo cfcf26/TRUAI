@@ -162,13 +162,15 @@ export default function Home() {
           const transformedContent: AnalyzedContent = {
             title: `분석 결과: ${data.source_url}`,
             sourceUrl: data.source_url,
-            paragraphs: data.paragraphs.map((p: { id: number; text: string; links: string[] }) => ({
+            paragraphs: data.paragraphs.map((p: { id: number; text: string; links: string[]; isHeading?: boolean; headingLevel?: number }) => ({
               id: p.id,
               content: p.text,
               confidenceLevel: "medium", // 초기 상태는 '분석중'
               confidence: 50, // 초기 값
               sources: p.links,
               reasoning: "현재 문단에 대한 신뢰도를 분석하고 있습니다...",
+              isHeading: p.isHeading,
+              headingLevel: p.headingLevel,
             })),
           };
           setAnalyzedContent(transformedContent);

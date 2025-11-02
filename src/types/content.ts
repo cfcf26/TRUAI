@@ -7,6 +7,8 @@ export interface ParagraphAnalysis {
   confidenceLevel: ConfidenceLevel;
   sources: string[];
   reasoning: string;
+  isHeading?: boolean;
+  headingLevel?: number;
 }
 
 export interface AnalyzedContent {

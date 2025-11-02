@@ -11,6 +11,8 @@ export const ParagraphSchema = z.object({
   order: z.number(),
   text: z.string(),
   links: z.array(z.string().url()),
+  isHeading: z.boolean().optional(),
+  headingLevel: z.number().min(1).max(6).optional(),
 });
 
 export const DocumentSchema = z.object({

@@ -11,6 +11,10 @@ export interface Paragraph {
   text: string;
   /** 문단에 연결된 출처 링크들 */
   links: string[];
+  /** 헤딩 여부 (헤딩은 검증에서 제외하고 UI에서 강조 표시) */
+  isHeading?: boolean;
+  /** 헤딩 레벨 (1-6, isHeading이 true일 때만) */
+  headingLevel?: number;
 }
 
 /**

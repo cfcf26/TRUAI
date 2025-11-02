@@ -18,9 +18,31 @@ export async function verifyParagraph(
   docId: string,
   paragraph: Paragraph
 ): Promise<VerificationResult> {
-  const { id: paragraphId, text, links } = paragraph;
+  const { id: paragraphId, text, links, isHeading } = paragraph;
 
   try {
+    // Skip verification for headings
+    if (isHeading) {
+      console.log(
+        `[Verification] Skipping verification for heading paragraph ${paragraphId}`
+      );
+
+      const headingResult: VerificationResult = {
+        doc_id: docId,
+        paragraph_id: paragraphId,
+        confidence: 'high', // 헤딩은 검증 불필요하므로 high로 설정
+        summary_of_sources: '제목/헤딩 - 검증 대상 아님',
+        reasoning: '이 문단은 제목 또는 헤딩이므로 검증하지 않습니다.',
+        link_digests: [],
+      };
+
+      // Store result immediately for headings
+      storage.updateJobStatus(docId, paragraphId, 'in_progress');
+      storage.storeResult(headingResult);
+
+      return headingResult;
+    }
+
     console.log(
       `[Verification] Starting verification for paragraph ${paragraphId} in document ${docId}`
     );
