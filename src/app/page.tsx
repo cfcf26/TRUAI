@@ -14,6 +14,7 @@ export default function Home() {
   const [inputValue, setInputValue] = useState("");
   const [docId, setDocId] = useState<string | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Polling effect for verification updates
   useEffect(() => {
@@ -122,6 +123,20 @@ export default function Home() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docId, analyzedContent?.title]); // Use title as dependency to avoid infinite loop
+
+  // Scroll to top button visibility
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const placeholders = [
     "논문 URL을 입력하세요...",
@@ -260,6 +275,29 @@ export default function Home() {
           <main className="py-12">
             <ContentAnalyzer content={analyzedContent} />
           </main>
+
+          {/* Scroll to Top Button */}
+          {showScrollTop && (
+            <button
+              onClick={scrollToTop}
+              className="fixed bottom-8 right-8 w-12 h-12 bg-[#155DFC] hover:bg-[#0d47cc] text-white rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50"
+              aria-label="맨 위로 가기"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 10l7-7m0 0l7 7m-7-7v18"
+                />
+              </svg>
+            </button>
+          )}
         </div>
       )}
 
