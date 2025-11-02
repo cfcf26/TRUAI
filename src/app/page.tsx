@@ -243,7 +243,14 @@ export default function Home() {
           {/* Header */}
           <header className="border-b border-gray-200">
             <div className="max-w-7xl mx-auto px-6 py-6">
-              <h1 className="text-[24px] font-medium leading-9 tracking-[0.0703125px] text-[#101828]">
+              <h1
+                className="text-[24px] font-medium leading-9 tracking-[0.0703125px] text-[#101828] cursor-pointer hover:text-[#155DFC] transition-colors"
+                onClick={() => {
+                  setAnalyzedContent(null);
+                  setDocId(null);
+                  setInputValue("");
+                }}
+              >
                 AI 할루시네이션 검증
               </h1>
             </div>
