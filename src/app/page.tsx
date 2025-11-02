@@ -140,6 +140,7 @@ export default function Home() {
   };
 
   const placeholders = [
+    "초록색은 높은 신뢰도, 빨간색은 낮은 신뢰도를 의미해요",
     "AI 리서치 URL을 입력하세요...",
     "AI 리서치의 출처를 확인하세요...",
     "검증하고 싶은 자료 URL을 입력하세요...",
