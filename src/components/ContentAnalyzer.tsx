@@ -176,7 +176,7 @@ export function ContentAnalyzer({ content }: ContentAnalyzerProps) {
                 </h4>
                 <div className="space-y-3">
                   {selectedParagraph.linkDigests && selectedParagraph.linkDigests.length > 0 ? (
-                    selectedParagraph.linkDigests.map((digest, idx) => {
+                    deduplicateByHostname(selectedParagraph.linkDigests).map((digest, idx) => {
                       let hostname = digest.url;
                       let displayUrl = digest.url;
                       try {
@@ -223,7 +223,7 @@ export function ContentAnalyzer({ content }: ContentAnalyzerProps) {
                       );
                     })
                   ) : (
-                    selectedParagraph.sources.map((source, idx) => {
+                    deduplicateByHostname(selectedParagraph.sources).map((source, idx) => {
                       let hostname = source;
                       let displayUrl = source;
                       try {
@@ -277,4 +277,23 @@ export function ContentAnalyzer({ content }: ContentAnalyzerProps) {
       </div>
     </div>
   );
+}
+
+// Helper function to deduplicate URLs by hostname
+function deduplicateByHostname<T extends { url: string } | string>(items: T[]): T[] {
+  const seenHostnames = new Set<string>();
+  return items.filter((item) => {
+    const url = typeof item === 'string' ? item : item.url;
+    try {
+      const hostname = new URL(url).hostname.replace(/^www\./, '');
+      if (seenHostnames.has(hostname)) {
+        return false;
+      }
+      seenHostnames.add(hostname);
+      return true;
+    } catch {
+      // If URL parsing fails, keep the item
+      return true;
+    }
+  });
 }
