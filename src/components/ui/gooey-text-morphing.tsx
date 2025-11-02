@@ -22,10 +22,19 @@ export function GooeyText({
   const text2Ref = React.useRef<HTMLSpanElement>(null);
 
   React.useEffect(() => {
-    let textIndex = texts.length - 1;
+    let textIndex = 0;
     let time = new Date();
     let morph = 0;
     let cooldown = cooldownTime;
+
+    // Initialize text content immediately
+    if (text1Ref.current && text2Ref.current) {
+      text1Ref.current.textContent = texts[0];
+      text2Ref.current.textContent = texts[1 % texts.length];
+      text1Ref.current.style.opacity = "100%";
+      text1Ref.current.style.filter = "";
+      text2Ref.current.style.opacity = "0%";
+    }
 
     const setMorph = (fraction: number) => {
       if (text1Ref.current && text2Ref.current) {

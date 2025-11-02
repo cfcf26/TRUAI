@@ -203,9 +203,9 @@ export default function Home() {
   };
 
   const loadingMessages = [
+    "검증 완료 시 초록색(신뢰도 높음), 빨간색(신뢰도 낮음)으로 표시돼요",
     "주소를 확인 중이에요",
-    "공유하신 링크에서 심층 리서치 결과를 가져오고 있어요",
-    "거의 다 왔어요 잠시만요!"
+    "공유하신 링크에서 심층 리서치 결과를 가져오고 있어요"
   ];
 
   return (
@@ -337,7 +337,7 @@ export default function Home() {
                     transition={{ delay: 0.2, duration: 0.5 }}
                     className="text-base sm:text-lg text-muted-foreground dark:text-gray-300 max-w-2xl mx-auto px-4"
                   >
-                    AI 기반 팩트체크로 연구 자료의 신뢰성을 검증하세요
+                    AI 기반 팩트체크로 심층 리서치 결과의 신뢰성을 검증하세요
                   </motion.p>
 
                   {/* Input Field */}
