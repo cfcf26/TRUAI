@@ -84,40 +84,6 @@ export interface GPTVerificationOutput {
 }
 
 // ============================================================================
-// WebSocket Message Types
-// ============================================================================
-
-export interface WSVerificationRequest {
-  type: 'verify';
-  doc_id: string;
-  paragraphs: Paragraph[];
-}
-
-export interface WSVerificationUpdate {
-  type: 'verification_update';
-  result: VerificationResult;
-}
-
-export interface WSVerificationComplete {
-  type: 'verification_complete';
-  doc_id: string;
-}
-
-export interface WSVerificationError {
-  type: 'verification_error';
-  doc_id: string;
-  paragraph_id: number;
-  error: string;
-}
-
-export type WSServerMessage =
-  | WSVerificationUpdate
-  | WSVerificationComplete
-  | WSVerificationError;
-
-export type WSClientMessage = WSVerificationRequest;
-
-// ============================================================================
 // Storage Types
 // ============================================================================
 
