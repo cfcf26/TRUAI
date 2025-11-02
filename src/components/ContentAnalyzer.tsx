@@ -1,9 +1,12 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AnalyzedContent, ParagraphAnalysis } from "@/types/content";
+import { Spinner } from "@/components/ui/Spinner";
 
 interface ContentAnalyzerProps {
   content: AnalyzedContent;
@@ -66,65 +69,81 @@ export function ContentAnalyzer({ content }: ContentAnalyzerProps) {
 
           {/* Paragraphs */}
           <div className="space-y-0">
-            {content.paragraphs.map((paragraph) => (
-              <div
-                key={paragraph.id}
-                className={`${paragraph.isHeading ? '' : 'p-3 rounded my-2'} ${getBackgroundColor(paragraph)}`}
-                onClick={() => !paragraph.isHeading && setSelectedParagraph(paragraph)}
-                onMouseEnter={() => !paragraph.isHeading && setSelectedParagraph(paragraph)}
-              >
-                <div className="prose prose-sm max-w-none">
-                  {paragraph.isHeading ? (
-                    // Render heading with appropriate HTML tag (h1, h2, h3, etc.)
-                    (() => {
-                      const HeadingTag = `h${paragraph.headingLevel || 1}` as keyof JSX.IntrinsicElements;
-                      return (
-                        <HeadingTag className={getHeadingStyle(paragraph.headingLevel)}>
-                          {paragraph.content}
-                        </HeadingTag>
-                      );
-                    })()
-                  ) : (
-                    // Render regular paragraph
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        p: ({ children }) => (
-                          <p className="text-[16px] leading-[26px] -tracking-[0.3125px] text-[#101828] mb-0">
-                            {children}
-                          </p>
-                        ),
-                        a: ({ children, href }) => (
-                          <a
-                            href={href}
-                            className="text-[#155DFC] hover:underline"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {children}
-                          </a>
-                        ),
-                      }}
-                    >
-                      {paragraph.content}
-                    </ReactMarkdown>
-                  )}
-                </div>
+            {(() => {
+              const activeProcessingParagraph = content.paragraphs.find(
+                (paragraph) =>
+                  !paragraph.isHeading &&
+                  paragraph.confidence === 50 &&
+                  paragraph.reasoning.includes("분석하고 있습니다")
+              );
 
-                {/* Confidence Indicator - only show "분석 중" if confidence is 50 (initial state) and reasoning contains "분석하고 있습니다" */}
-                {!paragraph.isHeading &&
-                 selectedParagraph?.id === paragraph.id &&
-                 paragraph.confidence === 50 &&
-                 paragraph.reasoning.includes("분석하고 있습니다") && (
-                  <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
-                    <div className="w-4 h-4 border-2 border-gray-300 rounded-full" />
-                    <span className="text-[14px] leading-5 -tracking-[0.150391px]">
-                      분석 중...
-                    </span>
+              const activeProcessingId = activeProcessingParagraph?.id;
+
+              return content.paragraphs.map((paragraph) => {
+                const isProcessing =
+                  !paragraph.isHeading &&
+                  paragraph.confidence === 50 &&
+                  paragraph.reasoning.includes("분석하고 있습니다");
+                const isActiveProcessing = paragraph.id === activeProcessingId;
+
+                return (
+                  <div
+                    key={paragraph.id}
+                    className={`${paragraph.isHeading ? "" : "p-3 rounded my-2"} ${getBackgroundColor(paragraph)}`}
+                    onClick={() => !paragraph.isHeading && setSelectedParagraph(paragraph)}
+                    onMouseEnter={() => !paragraph.isHeading && setSelectedParagraph(paragraph)}
+                  >
+                    <div className="prose prose-sm max-w-none">
+                      {paragraph.isHeading ? (
+                        // Render heading with appropriate HTML tag (h1, h2, h3, etc.)
+                        (() => {
+                          const HeadingTag = `h${paragraph.headingLevel || 1}` as keyof JSX.IntrinsicElements;
+                          return (
+                            <HeadingTag className={getHeadingStyle(paragraph.headingLevel)}>
+                              {paragraph.content}
+                            </HeadingTag>
+                          );
+                        })()
+                      ) : (
+                        // Render regular paragraph
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ children }) => (
+                              <p className="text-[16px] leading-[26px] -tracking-[0.3125px] text-[#101828] mb-0">
+                                {children}
+                              </p>
+                            ),
+                            a: ({ children, href }) => (
+                              <a
+                                href={href}
+                                className="text-[#155DFC] hover:underline"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                {children}
+                              </a>
+                            ),
+                          }}
+                        >
+                          {paragraph.content}
+                        </ReactMarkdown>
+                      )}
+                    </div>
+
+                    {/* Processing indicator remains visible even without hover */}
+                    {isProcessing && isActiveProcessing && (
+                      <div className="mt-3 flex items-center gap-2 text-sm text-[#155DFC]">
+                        <Spinner size="sm" />
+                        <span className="text-[14px] leading-5 -tracking-[0.150391px]">
+                          분석 중...
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                );
+              });
+            })()}
           </div>
         </div>
       </div>
@@ -191,25 +210,110 @@ export function ContentAnalyzer({ content }: ContentAnalyzerProps) {
                   </p>
                 </div>
               )}
-              {selectedParagraph.sources.length > 0 && (
+              {selectedParagraph.linkDigests && selectedParagraph.linkDigests.length > 0 ? (
+                <div>
+                  <p className="text-gray-600 mb-2">출처</p>
+                  <div className="space-y-3">
+                    {selectedParagraph.linkDigests.map((digest, idx) => {
+                      let hostname = digest.url;
+                      let displayUrl = digest.url;
+                      try {
+                        const parsed = new URL(digest.url);
+                        hostname = parsed.hostname.replace(/^www\./, "");
+                        displayUrl =
+                          `${hostname}${parsed.pathname}${parsed.search}`.replace(/\/$/, "") ||
+                          hostname;
+                      } catch {
+                        hostname = digest.url;
+                        displayUrl = digest.url;
+                      }
+
+                      return (
+                        <a
+                          key={idx}
+                          href={digest.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group grid grid-cols-[40px_1fr_auto] items-start gap-4 rounded-2xl border border-gray-200 bg-white p-4 transition-all hover:border-gray-300 hover:shadow-[0_12px_28px_-10px_rgba(15,23,42,0.35)]"
+                        >
+                          <img
+                            src={`https://www.google.com/s2/favicons?domain=${hostname}&sz=64`}
+                            alt={`${hostname} favicon`}
+                            width={32}
+                            height={32}
+                            className="h-10 w-10 rounded-full bg-white shadow-sm"
+                          />
+
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="text-[14px] font-medium leading-5 text-[#101828] transition-colors group-hover:text-[#155DFC] truncate">
+                              {digest.title || hostname}
+                            </p>
+
+                            <p className="text-[12px] uppercase tracking-[0.08em] text-[#98A2B3] truncate" title={digest.url}>
+                              {displayUrl}
+                            </p>
+                          </div>
+
+                          <span className="ml-auto text-[#98A2B3] transition-transform group-hover:translate-x-1">
+                            →
+                          </span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : selectedParagraph.sources.length > 0 ? (
                 <div>
                   <p className="text-gray-600 mb-1">출처</p>
-                  <ul className="list-disc list-inside text-[#155DFC]">
-                    {selectedParagraph.sources.map((source, idx) => (
-                      <li key={idx}>
+                  <div className="space-y-3">
+                    {selectedParagraph.sources.map((source, idx) => {
+                      let hostname = source;
+                      let displayUrl = source;
+                      try {
+                        const parsed = new URL(source);
+                        hostname = parsed.hostname.replace(/^www\./, "");
+                        displayUrl =
+                          `${hostname}${parsed.pathname}${parsed.search}`.replace(/\/$/, "") ||
+                          hostname;
+                      } catch {
+                        hostname = source;
+                        displayUrl = source;
+                      }
+
+                      return (
                         <a
+                          key={idx}
                           href={source}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:underline"
+                          className="group grid grid-cols-[40px_1fr_auto] items-start gap-4 rounded-2xl border border-gray-200 bg-white p-4 transition-all hover:border-gray-300 hover:shadow-[0_12px_28px_-10px_rgba(15,23,42,0.35)]"
                         >
-                          {source}
+                          <img
+                            src={`https://www.google.com/s2/favicons?domain=${hostname}&sz=64`}
+                            alt={`${hostname} favicon`}
+                            width={32}
+                            height={32}
+                            className="h-10 w-10 rounded-full bg-white shadow-sm"
+                          />
+
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="text-[14px] font-medium leading-5 text-[#101828] truncate transition-colors group-hover:text-[#155DFC]">
+                              {hostname}
+                            </p>
+                            <p className="text-[12px] uppercase tracking-[0.08em] text-[#98A2B3] truncate" title={source}>
+                              {displayUrl}
+                            </p>
+                          </div>
+
+                          <span className="ml-auto text-[#98A2B3] transition-transform group-hover:translate-x-1">
+                            →
+                          </span>
                         </a>
-                      </li>
-                    ))}
-                  </ul>
+                      );
+                    })}
+                  </div>
                 </div>
-              )}
+              ) : null}
               <div>
                 <p className="text-gray-600 mb-1">분석 근거</p>
                 <p className="text-[#364153] text-[14px] leading-5">
