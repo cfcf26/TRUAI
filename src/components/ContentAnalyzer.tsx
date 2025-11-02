@@ -139,93 +139,39 @@ export function ContentAnalyzer({ content }: ContentAnalyzerProps) {
 
       {/* Right Panel */}
       <div className="w-[384px] flex-shrink-0 space-y-6 sticky top-6 self-start max-h-[calc(100vh-3rem)] overflow-y-auto overflow-x-hidden">
-        {/* Analysis Info */}
-        <div className="bg-gray-50 border border-gray-200 rounded-[10px] overflow-hidden">
-          <div className="bg-white border-b border-gray-200 p-4">
-            <h3 className="text-[18px] font-medium leading-[27px] -tracking-[0.439453px] text-[#101828]">
-              신뢰도 분석
-            </h3>
-          </div>
-          <div className="p-12 pt-16 text-center">
-            <p className="text-[16px] leading-6 -tracking-[0.3125px] text-[#6A7282]">
-              문단에 마우스를 올리거나
-            </p>
-            <p className="text-[16px] leading-6 -tracking-[0.3125px] text-[#6A7282] mt-0">
-              클릭하여 분석 결과를 확인하세요
-            </p>
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div className="bg-white border border-gray-200 rounded-[10px] p-4 space-y-3">
-          <h4 className="text-[16px] font-medium leading-6 -tracking-[0.3125px] text-[#101828]">
-            신뢰도 범례
-          </h4>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 bg-[#B9F8CF] border-2 border-[#7BF1A8] rounded" />
-              <span className="text-[16px] leading-6 -tracking-[0.3125px] text-[#364153]">
-                높음 (80-100)
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 bg-[#FFF085] border-2 border-[#FFDF20] rounded" />
-              <span className="text-[16px] leading-6 -tracking-[0.3125px] text-[#364153]">
-                보통 (50-79)
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 bg-[#FFC9C9] border-2 border-[#FFA2A2] rounded" />
-              <span className="text-[16px] leading-6 -tracking-[0.3125px] text-[#364153]">
-                낮음 (0-49)
-              </span>
-            </div>
-          </div>
-        </div>
-
         {/* Selected Paragraph Details */}
         {selectedParagraph && (
-          <div className="bg-white border border-gray-200 rounded-[10px] p-4">
-            <h4 className="text-[16px] font-medium leading-6 -tracking-[0.3125px] text-[#101828] mb-3">
-              분석 상세
-            </h4>
-            <div className="space-y-3 text-sm">
-              {/* Only show confidence score if paragraph is verified */}
-              {!(selectedParagraph.confidence === 50 && selectedParagraph.reasoning.includes("분석하고 있습니다")) && (
-                <div>
-                  <p className="text-gray-600 mb-1">신뢰도 점수</p>
-                  <p className="text-[16px] font-medium text-[#101828]">
-                    {selectedParagraph.confidence}%
-                  </p>
-                </div>
-              )}
-              {selectedParagraph.sources.length > 0 && (
-                <div>
-                  <p className="text-gray-600 mb-1">출처</p>
-                  <ul className="list-disc list-inside text-[#155DFC]">
-                    {selectedParagraph.sources.map((source, idx) => (
-                      <li key={idx}>
-                        <a
-                          href={source}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:underline"
-                        >
-                          {source}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div>
-                <p className="text-gray-600 mb-1">분석 근거</p>
-                <p className="text-[#364153] text-[14px] leading-5">
-                  {selectedParagraph.reasoning}
-                </p>
-              </div>
+          <>
+            <div className="bg-white border border-gray-200 rounded-[10px] p-4">
+              <h4 className="text-[16px] font-medium leading-6 -tracking-[0.3125px] text-[#101828] mb-3">
+                분석 근거
+              </h4>
+              <p className="text-[#364153] text-[14px] leading-5">
+                {selectedParagraph.reasoning}
+              </p>
             </div>
-          </div>
+            {selectedParagraph.sources.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-[10px] p-4">
+                <h4 className="text-[16px] font-medium leading-6 -tracking-[0.3125px] text-[#101828] mb-3">
+                  출처
+                </h4>
+                <ul className="list-disc list-inside text-[#155DFC]">
+                  {selectedParagraph.sources.map((source, idx) => (
+                    <li key={idx}>
+                      <a
+                        href={source}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline"
+                      >
+                        {source}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
