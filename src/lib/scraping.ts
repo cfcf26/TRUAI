@@ -194,14 +194,20 @@ export async function scrapeUrl(url: string): Promise<SourceContent> {
     const apiUrl = new URL('https://app.scrapingbee.com/api/v1/');
     apiUrl.searchParams.append('api_key', SCRAPINGBEE_API_KEY);
     apiUrl.searchParams.append('url', url);
-    apiUrl.searchParams.append('render_js', 'false'); // Set to 'true' if JavaScript rendering is needed
+    apiUrl.searchParams.append('render_js', 'true'); // Set to 'true' if JavaScript rendering is needed
+    apiUrl.searchParams.append('premium_proxy', 'true');
+    apiUrl.searchParams.append('block_ads', 'true');
+    apiUrl.searchParams.append('block_resources', 'true');
+    apiUrl.searchParams.append('stealth_proxy', 'true');
+    // apiUrl.searchParams.append('wait_browser', 'networkidle2');
+    // apiUrl.searchParams.append('wait', '2000'); // Wait 2 seconds after load
 
     // Fetch with timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), SCRAPING_TIMEOUT);
 
     const response = await fetch(apiUrl.toString(), {
-      signal: controller.signal,
+      // signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
@@ -247,17 +253,38 @@ export async function scrapeUrl(url: string): Promise<SourceContent> {
 }
 
 /**
- * Scrapes multiple URLs sequentially with a limit of 5
+ * Scrapes multiple URLs with a concurrency limit of 3
+ * Processes up to 3 URLs in parallel, queuing the rest
  */
 export async function scrapeUrls(urls: string[]): Promise<SourceContent[]> {
   // Limit to 5 URLs as per ARCHITECTURE.md
   const limitedUrls = urls.slice(0, 5);
-  const results: SourceContent[] = [];
+  const CONCURRENCY = 7;
 
-  for (const url of limitedUrls) {
-    results.push(await scrapeUrl(url));
-  }
+  // Create a queue of URLs with their original indices
+  const queue = limitedUrls.map((url, index) => ({ url, index }));
+  const results: SourceContent[] = new Array(limitedUrls.length);
 
+  // Worker function that processes URLs from the queue
+  const worker = async (): Promise<void> => {
+    while (queue.length > 0) {
+      const item = queue.shift();
+      if (!item) break;
+
+      const result = await scrapeUrl(item.url);
+      results[item.index] = result;
+    }
+  };
+
+  // Create worker pool with concurrency limit
+  const workers = Array.from({ length: Math.min(CONCURRENCY, limitedUrls.length) }, () =>
+    worker()
+  );
+
+  // Wait for all workers to complete
+  await Promise.all(workers);
+  // Wait 2 seconds before returning results
+  await new Promise(resolve => setTimeout(resolve, 2000));
   return results;
 }
 
