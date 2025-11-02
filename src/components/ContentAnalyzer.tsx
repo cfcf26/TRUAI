@@ -140,19 +140,6 @@ export function ContentAnalyzer({ content }: ContentAnalyzerProps) {
               });
             })()}
           </div>
-
-          {/* Source URL */}
-          <div className="mt-10 pt-6 border-t border-gray-200">
-            <p className="text-[14px] leading-5 text-gray-600 mb-2">원본 출처</p>
-            <a
-              href={content.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[16px] leading-6 text-[#155DFC] hover:underline break-all"
-            >
-              {content.sourceUrl}
-            </a>
-          </div>
         </div>
       </div>
 
